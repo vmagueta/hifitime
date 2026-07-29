@@ -135,12 +135,15 @@ impl Format {
                     | Token::Second
                     | Token::Subsecond
                     | Token::OffsetHours
-                    | Token::OffsetMinutes => return true,
+                    | Token::OffsetMinutes
+                    // The Weekday name tokens need the Gregorian date so the reduced
+                    // (non-Gregorian) formatting branch does not have to handle them;
+                    // that branch only implements WeekdayDecimal.
+                    | Token::Weekday
+                    | Token::WeekdayShort => return true,
                     Token::Timescale
                     | Token::DayOfYearInteger
                     | Token::DayOfYear
-                    | Token::Weekday
-                    | Token::WeekdayShort
                     | Token::WeekdayDecimal => {
                         // These tokens don't need the gregorian, but other tokens in the list of tokens might.
                     }
@@ -305,7 +308,24 @@ impl Format {
                         }
                     }
                     Token::WeekdayDecimal => {
-                        todo!()
+                        // C89 weekday decimal: Sunday=0 .. Saturday=6. Parse it the
+                        // same way as the other numeric tokens (value_ok rejects
+                        // anything outside 0..=6), then invert to_c89_weekday to
+                        // recover the internal Monday=0 .. Sunday=6 ordering. Setting
+                        // `weekday` lets the mismatch check below validate it against
+                        // the parsed date, mirroring the `%A`/`%a` name tokens.
+                        match lexical_core::parse::<i32>(sub_str.as_bytes()) {
+                            Ok(val) => {
+                                prev_token.value_ok(val)?;
+                                weekday = Some(Weekday::from(val as i8 - 1));
+                            }
+                            Err(err) => {
+                                return Err(HifitimeError::Parse {
+                                    source: ParsingError::Lexical { err },
+                                    details: "could not parse weekday decimal",
+                                });
+                            }
+                        }
                     }
                     Token::MonthName | Token::MonthNameShort => {
                         match MonthName::from_str(sub_str) {

@@ -240,3 +240,102 @@ fn regression_test_gh_246() {
         })
     );
 }
+
+// Regression tests for the two efmt weekday-token panics reachable from the safe
+// public API in released 4.3.0:
+//   * `%w` (WeekdayDecimal) parsing hit `todo!()` in Format::parse.
+//   * weekday-only `%A`/`%a` formatting hit `unreachable!()` in Formatter.
+// 2026-07-26 (Sunday) .. 2026-08-01 (Saturday) give one epoch per C89 weekday
+// value (Sunday=0 .. Saturday=6).
+
+#[test]
+fn weekday_only_format_does_not_panic() {
+    use core::str::FromStr;
+    let e = Epoch::from_gregorian_utc_at_midnight(2026, 7, 29); // Wednesday
+
+    // `%A`/`%a` alone previously reached `unreachable!()`.
+    assert_eq!(
+        Formatter::new(e, Format::from_str("%A").unwrap()).to_string(),
+        "Wednesday"
+    );
+    assert_eq!(
+        Formatter::new(e, Format::from_str("%a").unwrap()).to_string(),
+        "Wed"
+    );
+    // `%w` alone already formatted; keep it as a control.
+    assert_eq!(
+        Formatter::new(e, Format::from_str("%w").unwrap()).to_string(),
+        "3"
+    );
+}
+
+#[test]
+fn weekday_decimal_parse_roundtrips() {
+    // `%w` parsing previously reached `todo!()`.
+    let wednesday = Epoch::from_gregorian_utc_at_midnight(2026, 7, 29);
+    assert_eq!(
+        Epoch::from_format_str("3 2026-07-29", "%w %Y-%m-%d").unwrap(),
+        wednesday
+    );
+
+    // Self-consistency: the formatter emits the `%w` value the parser reads back.
+    use core::str::FromStr;
+    let fmt = "%w %Y-%m-%d";
+    let formatted = Formatter::new(wednesday, Format::from_str(fmt).unwrap()).to_string();
+    assert_eq!(formatted, "3 2026-07-29");
+    assert_eq!(Epoch::from_format_str(&formatted, fmt).unwrap(), wednesday);
+}
+
+#[test]
+fn weekday_decimal_maps_every_c89_value() {
+    // Exhaustive inverse of Weekday::to_c89_weekday over a full week.
+    let week = [
+        (26, 0, Weekday::Sunday),
+        (27, 1, Weekday::Monday),
+        (28, 2, Weekday::Tuesday),
+        (29, 3, Weekday::Wednesday),
+        (30, 4, Weekday::Thursday),
+        (31, 5, Weekday::Friday),
+    ];
+    for (day, c89, wd) in week {
+        let s = format!("{c89} 2026-07-{day:02}");
+        let e = Epoch::from_format_str(&s, "%w %Y-%m-%d").unwrap();
+        assert_eq!(e.weekday(), wd, "%w={c89} should be {wd:?}");
+        assert_eq!(e, Epoch::from_gregorian_utc_at_midnight(2026, 7, day));
+    }
+    // Saturday (%w == 6) rolls into August.
+    let e = Epoch::from_format_str("6 2026-08-01", "%w %Y-%m-%d").unwrap();
+    assert_eq!(e.weekday(), Weekday::Saturday);
+}
+
+#[test]
+fn weekday_decimal_parse_validates_against_date() {
+    // 2026-07-29 is a Wednesday (%w == 3). Supplying 5 (Friday) must be rejected
+    // with WeekdayMismatch, exactly like the `%A`/`%a` name tokens already are.
+    assert_eq!(
+        Epoch::from_format_str("5 2026-07-29", "%w %Y-%m-%d"),
+        Err(HifitimeError::Parse {
+            source: ParsingError::WeekdayMismatch {
+                found: Weekday::Friday,
+                expected: Weekday::Wednesday,
+            },
+            details: "weekday and day number do not match",
+        })
+    );
+}
+
+#[test]
+fn weekday_decimal_parse_rejects_out_of_range() {
+    // The C89 weekday decimal is 0..=6; 7 must be a value error, not a silent wrap.
+    let err = Epoch::from_format_str("7 2026-07-29", "%w %Y-%m-%d").unwrap_err();
+    assert!(
+        matches!(
+            err,
+            HifitimeError::Parse {
+                source: ParsingError::ValueError,
+                ..
+            }
+        ),
+        "expected a ValueError, got {err:?}"
+    );
+}
