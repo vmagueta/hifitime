@@ -302,35 +302,7 @@ impl Sub for Duration {
         // Ensure that the durations are normalized to avoid extra logic to handle under/overflows
         self.normalize();
         rhs.normalize();
-        match self.centuries.checked_sub(rhs.centuries) {
-            None => {
-                // Underflowed, so we've hit the min
-                return Self::MIN;
-            }
-            Some(centuries) => {
-                self.centuries = centuries;
-            }
-        }
-
-        match self.nanoseconds.checked_sub(rhs.nanoseconds) {
-            None => {
-                // Decrease the number of centuries, and realign
-                match self.centuries.checked_sub(1) {
-                    Some(centuries) => {
-                        self.centuries = centuries;
-                        self.nanoseconds += NANOSECONDS_PER_CENTURY - rhs.nanoseconds;
-                    }
-                    None => {
-                        // We're at the min number of centuries already, and we have extra nanos, so we're saturated the duration limit
-                        return Self::MIN;
-                    }
-                };
-            }
-            Some(nanos) => self.nanoseconds = nanos,
-        };
-
-        self.normalize();
-        self
+        Self::from_total_nanoseconds(self.total_nanoseconds() - rhs.total_nanoseconds())
     }
 }
 

@@ -237,6 +237,23 @@ fn test_ops_near_bounds() {
     assert_ne!(Duration::MAX - 1 * Unit::Nanosecond, Duration::MAX);
 }
 
+/// Regression test for https://github.com/nyx-space/hifitime/issues/494
+#[test]
+fn test_subtraction_saturates_in_the_result_direction() {
+    assert_eq!(Duration::ZERO - Duration::MIN, Duration::MAX);
+    assert_eq!(Duration::MAX - Duration::MIN, Duration::MAX);
+    assert_eq!(Duration::ZERO - Duration::MAX, Duration::MIN);
+    assert_eq!(Duration::MIN - Duration::MAX, Duration::MIN);
+    assert_eq!(
+        Duration::ZERO - (Duration::MIN + Duration::EPSILON),
+        Duration::MAX - Duration::EPSILON
+    );
+    assert_eq!(
+        Duration::ZERO - (Duration::MAX - Duration::EPSILON),
+        Duration::MIN + Duration::EPSILON
+    );
+}
+
 /// Regression test for https://github.com/nyx-space/hifitime/issues/469
 /// Duration::PartialEq previously treated opposite-sign durations as equal
 /// (-15min == 15min), which violated Rust's Eq/Ord contract since the derived
