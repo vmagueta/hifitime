@@ -302,7 +302,35 @@ impl Sub for Duration {
         // Ensure that the durations are normalized to avoid extra logic to handle under/overflows
         self.normalize();
         rhs.normalize();
-        Self::from_total_nanoseconds(self.total_nanoseconds() - rhs.total_nanoseconds())
+
+        // Widen the century subtraction so that its direction is still known
+        // when the result exceeds the Duration bounds.
+        let mut centuries = i32::from(self.centuries) - i32::from(rhs.centuries);
+        let mut nanoseconds = match self.nanoseconds.checked_sub(rhs.nanoseconds) {
+            Some(nanoseconds) => nanoseconds,
+            None => {
+                centuries -= 1;
+                NANOSECONDS_PER_CENTURY - (rhs.nanoseconds - self.nanoseconds)
+            }
+        };
+
+        // MAX is the only normalized value whose nanoseconds equal a full
+        // century. Carry it before checking the widened century bounds.
+        if nanoseconds == NANOSECONDS_PER_CENTURY {
+            centuries += 1;
+            nanoseconds = 0;
+        }
+
+        if centuries > i32::from(i16::MAX) {
+            Self::MAX
+        } else if centuries < i32::from(i16::MIN) {
+            Self::MIN
+        } else {
+            Self {
+                centuries: centuries as i16,
+                nanoseconds,
+            }
+        }
     }
 }
 

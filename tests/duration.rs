@@ -252,6 +252,10 @@ fn test_subtraction_saturates_in_the_result_direction() {
         Duration::ZERO - (Duration::MAX - Duration::EPSILON),
         Duration::MIN + Duration::EPSILON
     );
+    assert_eq!(
+        Duration::MAX - 1 * Unit::Century,
+        Duration::from_parts(i16::MAX, 0)
+    );
 }
 
 /// Regression test for https://github.com/nyx-space/hifitime/issues/469
