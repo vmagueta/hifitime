@@ -1,6 +1,6 @@
 extern crate hifitime;
 
-use hifitime::{Epoch, TimeSeries, TimeUnits, Unit};
+use hifitime::{Duration, Epoch, TimeSeries, TimeUnits, Unit};
 
 #[test]
 fn test_timeseries() {
@@ -91,6 +91,19 @@ fn test_timeseries() {
     }
 
     assert_eq!(count, 7, "Should have six items in this iterator");
+}
+
+#[test]
+fn octal_format_pre_gps() {
+    // {:o} on a TimeSeries formats both bound epochs in GPS nanoseconds; a series
+    // starting before the GPS epoch (1980-01-06) used to panic.
+    let start = Epoch::from_gregorian_utc_at_midnight(1970, 1, 1);
+    let end = Epoch::from_gregorian_utc_at_midnight(1971, 1, 1);
+    let series = TimeSeries::inclusive(start, end, Duration::from_days(1.0));
+    assert_eq!(
+        format!("{series:o}"),
+        "TimeSeries [-315964819000000000 : -284428819000000000 : 1 day]"
+    );
 }
 
 #[test]

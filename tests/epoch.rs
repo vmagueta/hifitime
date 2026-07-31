@@ -5,7 +5,8 @@ use hifitime::{
     is_gregorian_valid, Duration, Epoch, HifitimeError, ParsingError, Polynomial, TimeScale,
     TimeUnits, Unit, Weekday, BDT_REF_EPOCH, DAYS_GPS_TAI_OFFSET, DAYS_PER_YEAR, GPST_REF_EPOCH,
     GST_REF_EPOCH, J1900_REF_EPOCH, J2000_REF_EPOCH, JD_J2000, MJD_J1900, MJD_J2000, MJD_OFFSET,
-    SECONDS_BDT_TAI_OFFSET, SECONDS_GPS_TAI_OFFSET, SECONDS_GST_TAI_OFFSET, SECONDS_PER_DAY,
+    SECONDS_BDT_TAI_OFFSET, SECONDS_GPS_TAI_OFFSET, SECONDS_GPS_TAI_OFFSET_I64,
+    SECONDS_GST_TAI_OFFSET, SECONDS_PER_DAY,
 };
 
 use hifitime::efmt::{Format, Formatter};
@@ -477,6 +478,46 @@ fn gpst() {
         Epoch::from_qzsst_nanoseconds(543210987).to_utc_duration(),
         Epoch::from_gpst_nanoseconds(543210987).to_utc_duration()
     );
+}
+
+#[test]
+fn octal_format_gpst() {
+    // {:o} on an Epoch prints GPST nanoseconds (decimal), signed. The u64 form
+    // overflowed more than one century from the GPS epoch and panicked via unwrap;
+    // the signed total nanoseconds never overflow.
+    assert_eq!(format!("{:o}", TimeScale::GPST.reference_epoch()), "0");
+
+    // In-range epochs are unchanged.
+    let mid = Epoch::from_gregorian_utc_at_midnight(2019, 8, 24);
+    assert_eq!(
+        format!("{:o}", mid),
+        format!("{}", mid.to_gpst_nanoseconds().unwrap())
+    );
+
+    // Pre-1980 (the UNIX epoch): negative GPST offset, no panic.
+    let unix = Epoch::from_gregorian_utc_at_midnight(1970, 1, 1);
+    let expected = unix.to_tai_duration().total_nanoseconds()
+        - SECONDS_GPS_TAI_OFFSET_I64 as i128 * 1_000_000_000;
+    assert!(expected < 0);
+    assert_eq!(format!("{:o}", unix), format!("{}", expected));
+
+    // One day either side of the GPS epoch.
+    assert_eq!(
+        format!("{:o}", Epoch::from_gregorian_utc_at_midnight(1980, 1, 5)),
+        "-86400000000000"
+    );
+    assert_eq!(
+        format!("{:o}", Epoch::from_gregorian_utc_at_midnight(1980, 1, 7)),
+        "86400000000000"
+    );
+
+    // Post-2080: to_gpst_nanoseconds errors (more than one century past the GPS
+    // epoch); the octal format no longer panics and prints the signed total.
+    let far = Epoch::from_gregorian_utc_at_midnight(2100, 1, 1);
+    assert!(far.to_gpst_nanoseconds().is_err());
+    let far_expected = far.to_tai_duration().total_nanoseconds()
+        - SECONDS_GPS_TAI_OFFSET_I64 as i128 * 1_000_000_000;
+    assert_eq!(format!("{:o}", far), format!("{}", far_expected));
 }
 
 #[test]

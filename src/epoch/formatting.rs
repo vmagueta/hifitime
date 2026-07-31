@@ -128,6 +128,6 @@ impl fmt::Pointer for Epoch {
 impl fmt::Octal for Epoch {
     /// Prints the Epoch in GPS
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_gpst_nanoseconds().unwrap())
+        write!(f, "{}", self.to_gpst_duration().total_nanoseconds())
     }
 }
