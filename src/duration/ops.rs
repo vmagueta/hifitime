@@ -302,35 +302,35 @@ impl Sub for Duration {
         // Ensure that the durations are normalized to avoid extra logic to handle under/overflows
         self.normalize();
         rhs.normalize();
-        match self.centuries.checked_sub(rhs.centuries) {
-            None => {
-                // Underflowed, so we've hit the min
-                return Self::MIN;
-            }
-            Some(centuries) => {
-                self.centuries = centuries;
-            }
-        }
 
-        match self.nanoseconds.checked_sub(rhs.nanoseconds) {
+        // Widen the century subtraction so that its direction is still known
+        // when the result exceeds the Duration bounds.
+        let mut centuries = i32::from(self.centuries) - i32::from(rhs.centuries);
+        let mut nanoseconds = match self.nanoseconds.checked_sub(rhs.nanoseconds) {
+            Some(nanoseconds) => nanoseconds,
             None => {
-                // Decrease the number of centuries, and realign
-                match self.centuries.checked_sub(1) {
-                    Some(centuries) => {
-                        self.centuries = centuries;
-                        self.nanoseconds += NANOSECONDS_PER_CENTURY - rhs.nanoseconds;
-                    }
-                    None => {
-                        // We're at the min number of centuries already, and we have extra nanos, so we're saturated the duration limit
-                        return Self::MIN;
-                    }
-                };
+                centuries -= 1;
+                NANOSECONDS_PER_CENTURY - (rhs.nanoseconds - self.nanoseconds)
             }
-            Some(nanos) => self.nanoseconds = nanos,
         };
 
-        self.normalize();
-        self
+        // MAX is the only normalized value whose nanoseconds equal a full
+        // century. Carry it before checking the widened century bounds.
+        if nanoseconds == NANOSECONDS_PER_CENTURY {
+            centuries += 1;
+            nanoseconds = 0;
+        }
+
+        if centuries > i32::from(i16::MAX) {
+            Self::MAX
+        } else if centuries < i32::from(i16::MIN) {
+            Self::MIN
+        } else {
+            Self {
+                centuries: centuries as i16,
+                nanoseconds,
+            }
+        }
     }
 }
 
