@@ -45,7 +45,7 @@ impl LeapSecond {
     }
 }
 
-const LATEST_LEAP_SECONDS: [LeapSecond; 42] = [
+static LATEST_LEAP_SECONDS: [LeapSecond; 42] = [
     LeapSecond::new(1_893_369_600.0, 1.417818, false), // SOFA: 01 Jan 1960
     LeapSecond::new(1_924_992_000.0, 1.422818, false), // SOFA: 01 Jan 1961
     LeapSecond::new(1_943_308_800.0, 1.372818, false), // SOFA: 01 Aug 1961
@@ -97,7 +97,7 @@ const LATEST_LEAP_SECONDS: [LeapSecond; 42] = [
 #[cfg_attr(kani, derive(kani::Arbitrary))]
 #[derive(Clone, Debug)]
 pub struct LatestLeapSeconds {
-    data: [LeapSecond; 42],
+    data: &'static [LeapSecond; 42],
     iter_pos: usize,
 }
 
@@ -152,7 +152,7 @@ impl LatestLeapSeconds {
 impl Default for LatestLeapSeconds {
     fn default() -> Self {
         Self {
-            data: LATEST_LEAP_SECONDS,
+            data: &LATEST_LEAP_SECONDS,
             iter_pos: 0,
         }
     }
