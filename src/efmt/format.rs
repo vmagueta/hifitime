@@ -214,6 +214,12 @@ impl Format {
                 if cur_token == Token::Timescale {
                     // Then we match the timescale directly.
                     if idx != s.len() - 1 {
+                        if !s.is_char_boundary(idx) {
+                            return Err(HifitimeError::Parse {
+                                source: ParsingError::ISO8601,
+                                details: "invalid character boundary",
+                            });
+                        }
                         // We have some remaining characters, so let's parse those in the only formats we know.
                         ts = TimeScale::from_str(s[idx..].trim()).with_context(|_| ParseSnafu {
                             details: "when parsing from format string",
@@ -273,6 +279,12 @@ impl Format {
                     idx + 1
                 };
 
+                if !s.is_char_boundary(prev_idx) || !s.is_char_boundary(end_idx) {
+                    return Err(HifitimeError::Parse {
+                        source: ParsingError::ISO8601,
+                        details: "invalid character boundary",
+                    });
+                }
                 let sub_str = &s[prev_idx..end_idx];
 
                 match prev_token {
@@ -384,7 +396,7 @@ impl Format {
                 // If we are about to parse an hours offset, we need to set the sign now.
                 if cur_token == Token::OffsetHours {
                     let sign_idx = if reached_fixed_length { idx + 1 } else { idx };
-                    if sign_idx < s.len() && &s[sign_idx..sign_idx + 1] == "-" {
+                    if sign_idx < s.len() && s.is_char_boundary(sign_idx) && s[sign_idx..].starts_with('-') {
                         offset_sign = -1;
                     }
                     prev_idx += 1;

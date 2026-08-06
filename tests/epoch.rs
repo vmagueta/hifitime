@@ -2043,6 +2043,16 @@ fn test_leap_seconds_file() {
 }
 
 #[test]
+fn test_from_str_invalid_char_boundary_regression() {
+    use core::str::FromStr;
+    // This starts with '\u{202b}' which is a 3-byte RTL override char in UTF-8: "\xe2\x80\xab"
+    // Previously, checking if &s[..2] == "JD" would panic on this string.
+    let s = "\u{202b}xxxxxxx";
+    let res = Epoch::from_str(s);
+    assert!(res.is_err());
+}
+
+#[test]
 fn regression_test_gh_204() {
     use core::str::FromStr;
 
