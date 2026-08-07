@@ -396,7 +396,10 @@ impl Format {
                 // If we are about to parse an hours offset, we need to set the sign now.
                 if cur_token == Token::OffsetHours {
                     let sign_idx = if reached_fixed_length { idx + 1 } else { idx };
-                    if sign_idx < s.len() && s.is_char_boundary(sign_idx) && s[sign_idx..].starts_with('-') {
+                    if sign_idx < s.len()
+                        && s.is_char_boundary(sign_idx)
+                        && s[sign_idx..].starts_with('-')
+                    {
                         offset_sign = -1;
                     }
                     prev_idx += 1;
