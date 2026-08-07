@@ -623,10 +623,10 @@ impl Epoch {
                 prev_idx = idx + 1;
                 // If we are about to parse an hours offset, we need to set the sign now.
                 if cur_token == Token::OffsetHours {
-                    if &s[idx..idx + 1] == "-" {
+                    if char == '-' {
                         offset_sign = -1;
                     }
-                    prev_idx += 1;
+                    prev_idx += char.len_utf8();
                 }
             }
         }

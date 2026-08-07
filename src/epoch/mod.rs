@@ -1128,11 +1128,11 @@ impl FromStr for Epoch {
                 details: "less than 7 characters",
             })
         } else {
-            let format = if &s[..2] == "JD" {
+            let format = if s.starts_with("JD") {
                 "JD"
-            } else if &s[..3] == "MJD" {
+            } else if s.starts_with("MJD") {
                 "MJD"
-            } else if &s[..3] == "SEC" {
+            } else if s.starts_with("SEC") {
                 "SEC"
             } else {
                 // Not a valid format, hopefully it's a Gregorian date.
@@ -1140,13 +1140,28 @@ impl FromStr for Epoch {
             };
 
             // This is a valid numerical format.
+            // Check that we can safely slice the last 3 characters and the numeric part.
+            if s.len() < 3 || !s.is_char_boundary(s.len() - 3) {
+                return Err(HifitimeError::Parse {
+                    source: ParsingError::UnknownFormat,
+                    details: "invalid character boundary",
+                });
+            }
+
             // Parse the time scale from the last three characters (TS trims white spaces).
             let ts = TimeScale::from_str(&s[s.len() - 3..]).with_context(|_| ParseSnafu {
                 details: "parsing from string",
             })?;
             // Iterate through the string to figure out where the numeric data starts and ends.
             let start_idx = format.len();
-            let num_str = s[start_idx..s.len() - ts.formatted_len()].trim();
+            let end_idx = s.len().saturating_sub(ts.formatted_len());
+            if !s.is_char_boundary(end_idx) {
+                return Err(HifitimeError::Parse {
+                    source: ParsingError::UnknownFormat,
+                    details: "invalid character boundary for numeric portion",
+                });
+            }
+            let num_str = s[start_idx..end_idx].trim();
             let value: f64 = match lexical_core::parse(num_str.as_bytes()) {
                 Ok(val) => val,
                 Err(_) => {
