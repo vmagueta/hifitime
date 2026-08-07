@@ -16,6 +16,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("UTC to ET", |b| {
+        b.iter(|| {
+            let e = Epoch::from_gregorian_utc_hms(2015, 2, 7, 11, 22, 33);
+            black_box(e.to_time_scale(hifitime::TimeScale::ET));
+        })
+    });
+
     c.bench_function("TT", |b| {
         b.iter(|| {
             let e = Epoch::from_gregorian_utc_hms(2015, 2, 7, 11, 22, 33);
